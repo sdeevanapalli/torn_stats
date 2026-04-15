@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Torn Stats · Compounding Gains Simulator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #fff;
+      color: #111;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+      padding: 28px 20px 56px;
+    }
+
+    /* ── Page header ── */
+    .page-header { max-width: 1200px; margin: 0 auto 24px; }
+    .page-header h1 { font-size: 1.25rem; font-weight: 700; color: #111; }
+    .page-header p  { margin-top: 4px; font-size: 13px; color: #6b7280; }
+
+    /* ── Two-column layout ── */
+    .layout {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 32px;
+      align-items: start;
+    }
+    @media (max-width: 780px) {
+      .layout { grid-template-columns: 1fr; gap: 24px; }
+    }
+
+    /* ── Left panel ── */
+    .left-panel { position: sticky; top: 24px; }
+
+    /* ── Input groups ── */
+    .input-group { margin-bottom: 16px; }
+    .input-group label {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #374151;
+    }
+    .input-group label .val {
+      color: #2563eb;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    .input-hint {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
+
+    /* ── Sliders ── */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      display: block;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #d1d5db;
+      outline: none;
+      cursor: pointer;
+      margin: 8px 0 4px;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #2563eb;
+      cursor: pointer;
+      border: 2px solid #fff;
+      outline: 2px solid #2563eb;
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #2563eb;
+      cursor: pointer;
+      border: 2px solid #fff;
+      outline: 2px solid #2563eb;
+    }
+    input[type="range"]::-moz-range-progress {
+      background: #2563eb;
+      height: 6px;
+      border-radius: 3px 0 0 3px;
+    }
+    input[type="range"]::-moz-range-track {
+      background: #d1d5db;
+      height: 6px;
+      border-radius: 3px;
+    }
+
+    /* ── Number / text inputs ── */
+    input[type="number"],
+    input[type="text"] {
+      display: block;
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      color: #111;
+      background: #fff;
+      -moz-appearance: textfield;
+    }
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+    input[type="number"]:focus,
+    input[type="text"]:focus { outline: none; border-color: #2563eb; }
+
+    /* ── Section divider ── */
+    .section-sep { border: none; border-top: 1px solid #e5e7eb; margin: 18px 0; }
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #9ca3af;
+      margin-bottom: 10px;
+    }
+
+    /* ── Faction perk collapsible ── */
+    details { margin-bottom: 16px; }
+    details > summary {
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      font-weight: 500;
+      color: #374151;
+      padding: 6px 0;
+      user-select: none;
+    }
+    details > summary::-webkit-details-marker { display: none; }
+    details > summary::after {
+      content: '›';
+      font-size: 18px;
+      color: #9ca3af;
+      line-height: 1;
+      transition: transform 0.15s;
+    }
+    details[open] > summary::after { transform: rotate(90deg); }
+    .fp-summary-val { font-size: 12px; color: #2563eb; font-weight: 600; margin-right: 4px; }
+
+    .faction-body { padding-top: 10px; }
+    .fp-tree-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #9ca3af;
+      margin: 12px 0 6px;
+    }
+    .fp-tree-label:first-child { margin-top: 0; }
+    .fp-row { margin-bottom: 8px; }
+    .fp-row label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 500;
+      color: #374151;
+      margin-bottom: 4px;
+    }
+    .fp-row label .val { color: #2563eb; font-weight: 600; }
+    .fp-row select {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+      color: #111;
+      background: #fff;
+      cursor: pointer;
+    }
+    .fp-row select:focus { outline: none; border-color: #2563eb; }
+    .fp-total-text {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #e5e7eb;
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    /* ── API section ── */
+    .api-row { display: flex; gap: 6px; }
+    .api-row input[type="text"] {
+      flex: 1;
+      font-family: monospace;
+      font-size: 13px;
+      padding: 9px 12px;
+    }
+    .api-row input[type="text"]::placeholder { color: #9ca3af; }
+    .api-btn {
+      padding: 9px 14px;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .api-btn:hover { background: #1d4ed8; }
+    #api-status { margin-top: 6px; font-size: 12px; color: #6b7280; min-height: 16px; }
+
+    /* ── Right panel ── */
+    .right-panel { display: flex; flex-direction: column; gap: 24px; }
+
+    /* ── Result cards ── */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    @media (max-width: 560px) { .cards { grid-template-columns: 1fr; } }
+    .card {
+      background: #f3f4f6;
+      border-left: 3px solid #2563eb;
+      border-radius: 6px;
+      padding: 16px 18px;
+    }
+    .card-label { font-size: 12px; color: #6b7280; margin-bottom: 8px; line-height: 1.3; }
+    .card-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: #111;
+      line-height: 1;
+      letter-spacing: -1px;
+    }
+    .card-sub { font-size: 11px; color: #9ca3af; margin-top: 5px; }
+
+    /* ── Chart ── */
+    #main-chart { display: block; width: 100% !important; }
+
+    /* ── Milestone table ── */
+    .milestone-title { font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead tr { background: #f3f4f6; }
+    th {
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #6b7280;
+      text-align: left;
+    }
+    td { padding: 10px 12px; color: #374151; border-top: 1px solid #e5e7eb; }
+    td.muted { color: #9ca3af; }
+    td.bold  { font-weight: 600; color: #111; }
+  </style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Torn Stats · Compounding Gains Simulator</h1>
+  <p>Model daily stat growth with compound interest — adjust parameters and see results update live.</p>
+</div>
+
+<div class="layout">
+
+  <!-- ── Left: Inputs ── -->
+  <div class="left-panel">
+
+    <div class="input-group">
+      <label for="n-startStat">Starting Stat <span class="val" id="val-startStat">100,000</span></label>
+      <input type="range" id="sl-startStat" min="0" max="10000000" step="10000" value="100000">
+      <input type="text"  id="n-startStat"  inputmode="decimal" value="100,000" autocomplete="off">
+      <p class="input-hint">e.g. 300k, 1.5m, 2b</p>
+    </div>
+
+    <div class="input-group">
+      <label for="n-gymDots">Gym Dots <span class="val" id="val-gymDots">5</span></label>
+      <input type="range"  id="sl-gymDots" min="1" max="10" step="1" value="5">
+      <input type="number" id="n-gymDots"  min="1" max="10" value="5">
+    </div>
+
+    <div class="input-group">
+      <label for="n-happy">Starting Happy <span class="val" id="val-happy">5,025</span></label>
+      <input type="range"  id="sl-happy" min="1000" max="10000" step="25" value="5025">
+      <input type="number" id="n-happy"  min="1000" max="10000" value="5025">
+    </div>
+
+    <div class="input-group">
+      <label for="n-energy">Energy Per Day <span class="val" id="val-energy">650</span></label>
+      <input type="range"  id="sl-energy" min="100" max="1300" step="10" value="650">
+      <input type="number" id="n-energy"  min="100" max="1300" value="650">
+    </div>
+
+    <div class="input-group">
+      <label for="n-milestone">Milestone Target <span class="val" id="val-milestone">300,000</span></label>
+      <input type="range" id="sl-milestone" min="10000" max="10000000" step="10000" value="300000">
+      <input type="text"  id="n-milestone"  inputmode="decimal" value="300,000" autocomplete="off">
+      <p class="input-hint">e.g. 300k, 1.5m, 2b</p>
+    </div>
+
+    <!-- ── Faction Perks collapsible ── -->
+    <details id="fp-details" open>
+      <summary>
+        Faction Perks
+        <span class="fp-summary-val" id="fp-summary-val">+55% (×1.55)</span>
+      </summary>
+      <div class="faction-body">
+
+        <div class="fp-tree-label">Primary — 1% per level</div>
+
+        <div class="fp-row">
+          <label>Speed training <span class="val" id="fp-p0-val">10%</span></label>
+          <input type="range" id="fp-p0" min="0" max="10" step="1" value="10">
+        </div>
+        <div class="fp-row">
+          <label>Strength training <span class="val" id="fp-p1-val">10%</span></label>
+          <input type="range" id="fp-p1" min="0" max="10" step="1" value="10">
+        </div>
+        <div class="fp-row">
+          <label>Defense training <span class="val" id="fp-p2-val">10%</span></label>
+          <input type="range" id="fp-p2" min="0" max="10" step="1" value="10">
+        </div>
+        <div class="fp-row">
+          <label>Dexterity training <span class="val" id="fp-p3-val">10%</span></label>
+          <input type="range" id="fp-p3" min="0" max="10" step="1" value="10">
+        </div>
+
+        <div class="fp-tree-label">Secondary</div>
+
+        <div class="fp-row">
+          <label>Speed / Strength extra</label>
+          <select id="fp-s0">
+            <option value="0">0%</option>
+            <option value="5" selected>5%</option>
+          </select>
+        </div>
+        <div class="fp-row">
+          <label>Defense / Dexterity extra</label>
+          <select id="fp-s1">
+            <option value="0">0%</option>
+            <option value="5" selected>5%</option>
+          </select>
+        </div>
+
+        <div class="fp-tree-label">Tertiary</div>
+
+        <div class="fp-row">
+          <label>Extra on one stat</label>
+          <select id="fp-t">
+            <option value="0">None (0%)</option>
+            <option value="5" selected>5% bonus</option>
+          </select>
+        </div>
+
+        <div class="fp-total-text" id="fp-total">Total faction bonus: +55% (×1.55)</div>
+      </div>
+    </details>
+
+    <hr class="section-sep">
+    <div class="section-label">Torn API — auto-fill stats</div>
+    <div class="api-row">
+      <input type="text" id="api-key" placeholder="API key (limited access)…" autocomplete="off" spellcheck="false">
+      <button class="api-btn" onclick="fetchTornStats()">Fetch</button>
+    </div>
+    <div id="api-status"></div>
+
+  </div>
+
+  <!-- ── Right: Results ── -->
+  <div class="right-panel">
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-label" id="c1-label">Days to milestone</div>
+        <div class="card-value" id="c1-val">—</div>
+        <div class="card-sub"  id="c1-sub">days</div>
+      </div>
+      <div class="card">
+        <div class="card-label" id="c2-label">Stat after 2× days</div>
+        <div class="card-value" id="c2-val">—</div>
+        <div class="card-sub"  id="c2-sub">starting from milestone</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Phase 2 speed gain</div>
+        <div class="card-value" id="c3-val">—</div>
+        <div class="card-sub">× faster than phase 1 start</div>
+      </div>
+    </div>
+
+    <canvas id="main-chart" height="280"></canvas>
+
+    <div>
+      <div class="milestone-title">Days to key milestones</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Milestone</th>
+            <th>Days to reach</th>
+            <th>Date achieved</th>
+          </tr>
+        </thead>
+        <tbody id="heat-body"></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  State
+// ═══════════════════════════════════════════════════════════════
+const S = {
+  startStat:     100000,
+  gymDots:       5,
+  startingHappy: 5025,
+  energyPerDay:  650,
+  factionPerk:   1.55,   // calculated from FP below
+  milestone:     300000,
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  Faction perk state
+// ═══════════════════════════════════════════════════════════════
+const FP = {
+  primary:   [10, 10, 10, 10],   // speed, str, def, dex  (0–10, 1% each)
+  secondary: [5, 5],             // speed/str, def/dex     (0 or 5%)
+  tertiary:  5,                  // one stat extra          (0 or 5%)
+};
+
+function calcFactionPerk() {
+  const primaryBonus   = FP.primary.reduce((a, b) => a + b, 0);
+  const secondaryBonus = FP.secondary.reduce((a, b) => a + b, 0);
+  const total = primaryBonus + secondaryBonus + FP.tertiary;
+  S.factionPerk = 1 + total / 100;
+  const txt = `Total faction bonus: +${total}% (×${S.factionPerk.toFixed(2)})`;
+  document.getElementById('fp-total').textContent      = txt;
+  document.getElementById('fp-summary-val').textContent = `+${total}% (×${S.factionPerk.toFixed(2)})`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Core formula
+// ═══════════════════════════════════════════════════════════════
+function dailyGain(currentStat, gymDots, startingHappy, energyPerDay, factionPerk) {
+  return (
+    ((gymDots * 4) * ((0.00019106 * currentStat) + (0.00226263 * startingHappy) + 0.55))
+    / 150 * 10
+  ) * (energyPerDay / 10) * factionPerk;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  runSimulation — full compound loop
+// ═══════════════════════════════════════════════════════════════
+function runSimulation({ startStat, gymDots, startingHappy, energyPerDay, factionPerk, days }) {
+  const out = [{ day: 0, stat: startStat }];
+  let s = startStat;
+  for (let d = 1; d <= days; d++) {
+    s += dailyGain(s, gymDots, startingHappy, energyPerDay, factionPerk);
+    out.push({ day: d, stat: s });
+  }
+  return out;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  timeMatcher
+// ═══════════════════════════════════════════════════════════════
+const MAX_DAYS = 50000;
+
+function timeMatcher(params, milestone) {
+  const { startStat, gymDots, startingHappy, energyPerDay, factionPerk } = params;
+
+  const phase1StartGain = dailyGain(startStat, gymDots, startingHappy, energyPerDay, factionPerk);
+
+  let daysToMilestone;
+  if (startStat >= milestone) {
+    daysToMilestone = 0;
+  } else {
+    daysToMilestone = MAX_DAYS;
+    let s = startStat;
+    for (let d = 1; d <= MAX_DAYS; d++) {
+      s += dailyGain(s, gymDots, startingHappy, energyPerDay, factionPerk);
+      if (s >= milestone) { daysToMilestone = d; break; }
+    }
+  }
+
+  let s2 = milestone;
+  let phase2EndGain = dailyGain(milestone, gymDots, startingHappy, energyPerDay, factionPerk);
+  for (let d = 1; d <= daysToMilestone; d++) {
+    const g = dailyGain(s2, gymDots, startingHappy, energyPerDay, factionPerk);
+    s2 += g;
+    if (d === daysToMilestone) phase2EndGain = g;
+  }
+
+  const speedupMultiplier = phase1StartGain > 0 ? phase2EndGain / phase1StartGain : 1;
+
+  return { daysToMilestone, statAfterDoubleTime: s2, speedupMultiplier };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Sampled chart data
+// ═══════════════════════════════════════════════════════════════
+function buildChartData(params, totalDays) {
+  if (totalDays < 1) totalDays = 1;
+  const MAX_PTS = 350;
+  const step = Math.max(1, Math.ceil(totalDays / MAX_PTS));
+  const { startStat, gymDots, startingHappy, energyPerDay, factionPerk } = params;
+  const g0 = dailyGain(startStat, gymDots, startingHappy, energyPerDay, factionPerk);
+
+  const xs = [0], compound = [startStat], linear = [startStat];
+  let s = startStat;
+
+  for (let d = 1; d <= totalDays; d++) {
+    s += dailyGain(s, gymDots, startingHappy, energyPerDay, factionPerk);
+    if (d % step === 0 || d === totalDays) {
+      xs.push(d);
+      compound.push(s);
+      linear.push(startStat + g0 * d);
+    }
+  }
+  return { xs, compound, linear };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Milestone heatmap
+// ═══════════════════════════════════════════════════════════════
+const HEAT_TARGETS = [100e3, 500e3, 1e6, 5e6, 10e6, 50e6, 100e6, 500e6, 1e9];
+
+function buildHeatmapData(params) {
+  const { startStat, gymDots, startingHappy, energyPerDay, factionPerk } = params;
+  return HEAT_TARGETS.map(target => {
+    if (startStat >= target) return { target, days: null, past: true };
+    let s = startStat;
+    for (let d = 1; d <= MAX_DAYS; d++) {
+      s += dailyGain(s, gymDots, startingHappy, energyPerDay, factionPerk);
+      if (s >= target) return { target, days: d, past: false };
+    }
+    return { target, days: null, past: false, capped: true };
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Number formatting
+// ═══════════════════════════════════════════════════════════════
+function fmt(n) {
+  if (n == null || isNaN(n)) return '—';
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return (n / 1e9).toFixed(3).replace(/\.?0+$/, '') + 'B';
+  if (abs >= 1e6) return (n / 1e6).toFixed(2).replace(/\.?0+$/, '') + 'M';
+  if (abs >= 1e3) return (n / 1e3).toFixed(1).replace(/\.?0+$/, '') + 'k';
+  return Math.round(n).toLocaleString();
+}
+function fmtComma(n) { return Math.round(n).toLocaleString(); }
+function fmtDate(daysFromNow) {
+  const d = new Date();
+  d.setDate(d.getDate() + Math.round(daysFromNow));
+  const mon = d.toLocaleDateString('en-US', { month: 'short' });
+  return `${mon} ${d.getDate()} ${d.getFullYear()}`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Shorthand parser  — "100k" → 100000, "1.5m" → 1500000, etc.
+// ═══════════════════════════════════════════════════════════════
+function parseShorthand(str) {
+  const s = String(str).trim().replace(/,/g, '').toLowerCase();
+  const m = s.match(/^([\d.]+)\s*([kmb]?)$/);
+  if (!m) return NaN;
+  let v = parseFloat(m[1]);
+  if (isNaN(v)) return NaN;
+  if      (m[2] === 'k') v *= 1_000;
+  else if (m[2] === 'm') v *= 1_000_000;
+  else if (m[2] === 'b') v *= 1_000_000_000;
+  return v;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Slider fill (webkit gradient trick)
+// ═══════════════════════════════════════════════════════════════
+function setSliderFill(sl) {
+  const min = parseFloat(sl.min);
+  const max = parseFloat(sl.max);
+  const pct = ((parseFloat(sl.value) - min) / (max - min)) * 100;
+  sl.style.background =
+    `linear-gradient(to right, #2563eb ${pct}%, #d1d5db ${pct}%)`;
+}
+
+function initSliderFills() {
+  document.querySelectorAll('input[type="range"]').forEach(setSliderFill);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Chart
+// ═══════════════════════════════════════════════════════════════
+const vertLinePlugin = {
+  id: 'vertLine',
+  afterDraw(chart, _args, opts) {
+    if (!opts || opts.xVal == null) return;
+    const { ctx, scales: { x, y } } = chart;
+    const px = x.getPixelForValue(opts.xVal);
+    if (px < x.left || px > x.right) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(px, y.top);
+    ctx.lineTo(px, y.bottom);
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = '#6b7280';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#6b7280';
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillText(opts.label || '', px + 5, y.top + 14);
+    ctx.restore();
+  }
+};
+Chart.register(vertLinePlugin);
+
+const chartInst = new Chart(document.getElementById('main-chart'), {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      {
+        label: 'Compound growth',
+        data: [],
+        borderColor: '#2563eb',
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.2,
+        order: 1,
+      },
+      {
+        label: 'Linear growth',
+        data: [],
+        borderColor: '#9ca3af',
+        backgroundColor: 'transparent',
+        borderWidth: 1.5,
+        borderDash: [5, 4],
+        pointRadius: 0,
+        tension: 0,
+        order: 2,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    animation: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: {
+        labels: {
+          color: '#374151',
+          font: { size: 12, family: 'system-ui, sans-serif' },
+          boxWidth: 20,
+          padding: 16,
+        }
+      },
+      tooltip: {
+        backgroundColor: '#fff',
+        borderColor: '#e5e7eb',
+        borderWidth: 1,
+        titleColor: '#111',
+        bodyColor: '#6b7280',
+        padding: 10,
+        callbacks: {
+          title: ctx => `Day ${fmtComma(ctx[0].parsed.x)}`,
+          label: ctx => ` ${ctx.dataset.label}: ${fmt(ctx.parsed.y)}`
+        }
+      },
+      vertLine: { xVal: null, label: '' }
+    },
+    scales: {
+      x: {
+        type: 'linear',
+        ticks: {
+          color: '#6b7280',
+          maxTicksLimit: 8,
+          font: { size: 11, family: 'system-ui, sans-serif' },
+          callback: v => fmtComma(v)
+        },
+        grid: { color: '#f3f4f6' },
+        border: { color: '#e5e7eb' },
+        title: { display: true, text: 'Days', color: '#6b7280', font: { size: 11 } }
+      },
+      y: {
+        ticks: {
+          color: '#6b7280',
+          font: { size: 11, family: 'system-ui, sans-serif' },
+          callback: v => fmt(v),
+          maxTicksLimit: 7,
+        },
+        grid: { color: '#f3f4f6' },
+        border: { color: '#e5e7eb' },
+        title: { display: true, text: 'Stat', color: '#6b7280', font: { size: 11 } }
+      }
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Main update
+// ═══════════════════════════════════════════════════════════════
+function update() {
+  const { daysToMilestone, statAfterDoubleTime, speedupMultiplier } = timeMatcher(S, S.milestone);
+  const milLabel = fmt(S.milestone);
+  const capped   = daysToMilestone >= MAX_DAYS;
+
+  document.getElementById('c1-label').textContent = `Days to ${milLabel}`;
+  document.getElementById('c1-val').textContent   = capped ? '>50k' : fmtComma(daysToMilestone);
+  document.getElementById('c1-sub').textContent   = daysToMilestone === 0 ? 'already past' : 'days';
+
+  document.getElementById('c2-label').textContent = `Stat after ${capped ? '>50k' : fmtComma(daysToMilestone * 2)} days`;
+  document.getElementById('c2-val').textContent   = daysToMilestone === 0 ? '—' : fmt(statAfterDoubleTime);
+  document.getElementById('c2-sub').textContent   = 'starting from milestone';
+
+  document.getElementById('c3-val').textContent   = daysToMilestone === 0 ? '—' : speedupMultiplier.toFixed(2) + '×';
+
+  const totalDays = daysToMilestone > 0 ? daysToMilestone * 2 : 730;
+  const { xs, compound, linear } = buildChartData(S, totalDays);
+  chartInst.data.labels = xs;
+  chartInst.data.datasets[0].data = xs.map((d, i) => ({ x: d, y: compound[i] }));
+  chartInst.data.datasets[1].data = xs.map((d, i) => ({ x: d, y: linear[i] }));
+  chartInst.options.plugins.vertLine.xVal  = daysToMilestone > 0 ? daysToMilestone : null;
+  chartInst.options.plugins.vertLine.label = daysToMilestone > 0
+    ? `Day ${fmtComma(daysToMilestone)} — ${milLabel}` : '';
+  chartInst.update('none');
+
+  const heatData = buildHeatmapData(S);
+  const heatRows = heatData.filter(r => !r.past);
+  document.getElementById('heat-body').innerHTML = heatRows.map(({ target, days, capped: c }) => {
+    const name = fmt(target);
+    if (c) return `<tr><td class="bold">${name}</td><td class="muted">&gt;50,000</td><td class="muted">—</td></tr>`;
+    return `<tr>
+      <td class="bold">${name}</td>
+      <td>${fmtComma(days)}</td>
+      <td>${fmtDate(days)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Debounce
+// ═══════════════════════════════════════════════════════════════
+let debTimer;
+function scheduleUpdate() {
+  clearTimeout(debTimer);
+  debTimer = setTimeout(update, 150);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Value span helper
+// ═══════════════════════════════════════════════════════════════
+const VAL_SPANS = {
+  startStat:     'val-startStat',
+  gymDots:       'val-gymDots',
+  startingHappy: 'val-happy',
+  energyPerDay:  'val-energy',
+  milestone:     'val-milestone',
+};
+function setValSpan(key, v) {
+  const el = document.getElementById(VAL_SPANS[key]);
+  if (el) el.textContent = fmtComma(v);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Wire standard slider + number pairs
+// ═══════════════════════════════════════════════════════════════
+function wirePair(slId, nId, key, min, max) {
+  const sl = document.getElementById(slId);
+  const nb = document.getElementById(nId);
+
+  sl.addEventListener('input', () => {
+    const v = Math.min(max, Math.max(min, parseFloat(sl.value)));
+    S[key] = v;
+    nb.value = v;
+    setSliderFill(sl);
+    setValSpan(key, v);
+    scheduleUpdate();
+  });
+
+  function fromNumber() {
+    let v = parseFloat(nb.value);
+    if (isNaN(v)) return;
+    S[key] = v;
+    sl.value = Math.min(parseFloat(sl.max), Math.max(parseFloat(sl.min), v));
+    setSliderFill(sl);
+    setValSpan(key, v);
+    scheduleUpdate();
+  }
+  nb.addEventListener('input',  fromNumber);
+  nb.addEventListener('change', fromNumber);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Wire text inputs with shorthand (startStat, milestone)
+// ═══════════════════════════════════════════════════════════════
+function wireTextPair(slId, nId, key) {
+  const sl = document.getElementById(slId);
+  const nb = document.getElementById(nId);
+
+  // Slider → format text input
+  sl.addEventListener('input', () => {
+    const v = parseFloat(sl.value);
+    S[key] = v;
+    nb.value = fmtComma(v);
+    setSliderFill(sl);
+    setValSpan(key, v);
+    scheduleUpdate();
+  });
+
+  // Live typing: try to parse, update state if valid
+  nb.addEventListener('input', () => {
+    const v = parseShorthand(nb.value);
+    if (!isNaN(v) && v >= 0) {
+      S[key] = v;
+      sl.value = Math.min(parseFloat(sl.max), Math.max(parseFloat(sl.min), v));
+      setSliderFill(sl);
+      setValSpan(key, v);
+      scheduleUpdate();
+    }
+  });
+
+  // Commit on blur or Enter: parse + reformat
+  function commit() {
+    const v = parseShorthand(nb.value);
+    if (!isNaN(v) && v >= 0) {
+      S[key] = v;
+      nb.value = fmtComma(v);
+      sl.value = Math.min(parseFloat(sl.max), Math.max(parseFloat(sl.min), v));
+      setSliderFill(sl);
+      setValSpan(key, v);
+      scheduleUpdate();
+    } else {
+      nb.value = fmtComma(S[key]);   // revert to last valid
+    }
+  }
+  nb.addEventListener('blur',    commit);
+  nb.addEventListener('keydown', e => { if (e.key === 'Enter') { commit(); nb.blur(); } });
+}
+
+wirePair('sl-gymDots', 'n-gymDots', 'gymDots',        1, 10);
+wirePair('sl-happy',   'n-happy',   'startingHappy',  1000, 10000);
+wirePair('sl-energy',  'n-energy',  'energyPerDay',   100, 1300);
+
+wireTextPair('sl-startStat', 'n-startStat', 'startStat');
+wireTextPair('sl-milestone', 'n-milestone', 'milestone');
+
+// ═══════════════════════════════════════════════════════════════
+//  Wire faction perk controls
+// ═══════════════════════════════════════════════════════════════
+[0, 1, 2, 3].forEach(i => {
+  const sl = document.getElementById(`fp-p${i}`);
+  setSliderFill(sl);
+  sl.addEventListener('input', () => {
+    FP.primary[i] = parseInt(sl.value, 10);
+    document.getElementById(`fp-p${i}-val`).textContent = sl.value + '%';
+    setSliderFill(sl);
+    calcFactionPerk();
+    scheduleUpdate();
+  });
+});
+
+[0, 1].forEach(i => {
+  document.getElementById(`fp-s${i}`).addEventListener('change', e => {
+    FP.secondary[i] = parseInt(e.target.value, 10);
+    calcFactionPerk();
+    scheduleUpdate();
+  });
+});
+
+document.getElementById('fp-t').addEventListener('change', e => {
+  FP.tertiary = parseInt(e.target.value, 10);
+  calcFactionPerk();
+  scheduleUpdate();
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Torn API fetch
+// ═══════════════════════════════════════════════════════════════
+async function fetchTornStats() {
+  const key = document.getElementById('api-key').value.trim();
+  const statusEl = document.getElementById('api-status');
+  if (!key) return;
+  statusEl.textContent = 'Fetching…';
+  statusEl.style.color = '#6b7280';
+  try {
+    const res = await fetch(
+      `https://api.torn.com/user/?selections=battlestats&key=${encodeURIComponent(key)}`
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.error || `Code ${data.error.code}`);
+    const total =
+      (data.strength  || 0) + (data.defense   || 0) +
+      (data.speed     || 0) + (data.dexterity || 0);
+    if (!total) throw new Error('No battle stat data returned');
+    S.startStat = total;
+    const nb = document.getElementById('n-startStat');
+    const sl = document.getElementById('sl-startStat');
+    nb.value = fmtComma(total);
+    sl.value = Math.min(total, parseFloat(sl.max));
+    setSliderFill(sl);
+    setValSpan('startStat', total);
+    statusEl.textContent = `Loaded: ${fmt(total)} total stats`;
+    statusEl.style.color = '#2563eb';
+    scheduleUpdate();
+  } catch (e) {
+    statusEl.textContent = `Error: ${e.message}`;
+    statusEl.style.color = '#dc2626';
+  }
+}
+
+document.getElementById('api-key').addEventListener('keydown', e => {
+  if (e.key === 'Enter') fetchTornStats();
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  Init
+// ═══════════════════════════════════════════════════════════════
+initSliderFills();
+calcFactionPerk();
+update();
+</script>
+</body>
+</html>
